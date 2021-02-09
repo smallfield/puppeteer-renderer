@@ -5,10 +5,15 @@ const { URL } = require('url')
 const express = require('express')
 const contentDisposition = require('content-disposition')
 const createRenderer = require('./renderer')
+const bodyParser = require('body-parser');
 
 const port = process.env.PORT || 3000
 
 const app = express()
+
+app.use(bodyParser.urlencoded({ extended: true }));
+
+const self_host_map = {}
 
 let renderer = null
 
@@ -17,8 +22,15 @@ app.set('query parser', s => qs.parse(s, { allowDots: true }))
 app.disable('x-powered-by')
 
 // Render url.
-app.use(async (req, res, next) => {
-  let { url, type, filename, ...options } = req.query
+app.all('/', async (req, res, next) => {
+  let { url, type, filename, htmlbody, ...options } = req.query
+  htmlbody = req.query.htmlbody || req.body.htmlbody
+
+  if (htmlbody) {
+    const key = Math.floor(Math.random() * 10000000000)
+    self_host_map[key] = htmlbody
+    url = `http://localhost:${port}/adhock/?key=${key}`
+  }
 
   if (!url) {
     return res.status(400).send('Search with url parameter. For eaxample, ?url=http://yourdomain')
@@ -74,6 +86,14 @@ app.use(async (req, res, next) => {
   } catch (e) {
     next(e)
   }
+})
+
+// adhock page
+app.get('/adhock', (req, res) => {
+  let { key } = req.query
+  let body = self_host_map[key]
+  delete self_host_map[key]
+  res.send(body)
 })
 
 // Error page.
